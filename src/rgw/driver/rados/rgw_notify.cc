@@ -151,6 +151,9 @@ private:
  
     struct token {
       tokens_waiter& waiter;
+      token(const token& other) : waiter(other.waiter) {
+        ++waiter.pending_tokens;
+      }
       token(tokens_waiter& _waiter) : waiter(_waiter) {
         ++waiter.pending_tokens;
       }
