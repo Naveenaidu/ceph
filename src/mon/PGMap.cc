@@ -1264,28 +1264,33 @@ void PGMap::apply_incremental(CephContext *cct, const Incremental& inc)
   if (inc.pg_scan)
     last_pg_scan = inc.pg_scan;
 }
+/*
+  Fetches all the pools present in the cluster. Any "stale", not-"active" PG's
+  of the pool are added as the values to the corresponding pool.
 
-void PGMap::calc_pool_stuck_unavailable_pg_map(const OSDMap& osdmap)
+  Eg: {1=[1.0],2=[],3=[]}
+
+  Here the cluster has 3 pools with id 1,2,3 and the Pool 1 has an inactive PG 1.0
+*/
+void PGMap::get_unavailable_pg_in_pool_map(const OSDMap& osdmap)
 {
   dout(20) << __func__ << dendl;
   pool_pg_unavailable_map.clear();
   utime_t now(ceph_clock_now());
   utime_t cutoff = now - utime_t(g_conf().get_val<int64_t>("mon_pg_stuck_threshold"), 0);
-  for (auto i = pg_stat.begin();
-       i != pg_stat.end();
-       ++i) {
+  for (auto i = pg_stat.begin(); i != pg_stat.end();++i) {
     const auto poolid = i->first.pool();
     pool_pg_unavailable_map[poolid];
     utime_t val = cutoff;
 
     if (!(i->second.state & PG_STATE_ACTIVE)) { // This case covers unknown state since unknow state bit == 0;
       if (i->second.last_active < val)
-	val = i->second.last_active;
+	      val = i->second.last_active;
     }
 
     if (i->second.state & PG_STATE_STALE) {
       if (i->second.last_unstale < val)
-	val = i->second.last_unstale;
+	      val = i->second.last_unstale;
     }
 
     if (val < cutoff) {
@@ -1523,7 +1528,7 @@ void PGMap::encode_digest(const OSDMap& osdmap,
   get_rules_avail(osdmap, &avail_space_by_rule);
   calc_osd_sum_by_class(osdmap);
   calc_purged_snaps();
-  calc_pool_stuck_unavailable_pg_map(osdmap);
+  get_unavailable_pg_in_pool_map(osdmap);
   PGMapDigest::encode(bl, features);
 }
 
