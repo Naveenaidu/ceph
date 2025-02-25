@@ -31,6 +31,7 @@ public:
   std::string path;
   std::string description;
   std::string nick;
+  std::string counter_name;
   enum perfcounter_type_d type;
 
   // For older clients that did not send priority, pretend everything
@@ -48,6 +49,7 @@ public:
     encode(path, bl);
     encode(description, bl);
     encode(nick, bl);
+    encode(counter_name, bl);
     static_assert(sizeof(type) == 1, "perfcounter_type_d must be one byte");
     encode((uint8_t)type, bl);
     encode(priority, bl);
@@ -61,6 +63,7 @@ public:
     decode(path, p);
     decode(description, p);
     decode(nick, p);
+    decode(counter_name, p);
     uint8_t raw_type;
     decode(raw_type, p);
     type = (enum perfcounter_type_d)raw_type;
@@ -80,6 +83,7 @@ public:
     f->dump_string("path", path);
     f->dump_string("description", description);
     f->dump_string("nick", nick);
+    f->dump_string("counter_name", counter_name);
     f->dump_int("type", type);
     f->dump_int("priority", priority);
     f->dump_int("unit", unit);
@@ -88,9 +92,10 @@ public:
   {
     ls.push_back(new PerfCounterType);
     ls.push_back(new PerfCounterType);
-    ls.back()->path = "mycounter";
-    ls.back()->description = "mycounter description";
-    ls.back()->nick = "mycounter nick";
+    ls.back()->path = "mycounter.counter_name";
+    ls.back()->description = "mycounter.counter_name description";
+    ls.back()->nick = "mycounter.counter_name nick";
+    ls.back()->counter_name = "counter_name";
     ls.back()->type = PERFCOUNTER_COUNTER;
     ls.back()->priority = PerfCountersBuilder::PRIO_CRITICAL;
     ls.back()->unit = UNIT_BYTES;
