@@ -2039,7 +2039,7 @@ options:
   type: bool
   level: dev
   desc: do not set tentacle feature for new mon clusters
-  default: false
+  default: true
   services:
   - mon
   flags:

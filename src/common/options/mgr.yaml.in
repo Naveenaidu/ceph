@@ -376,3 +376,9 @@ options:
   services:
   - mgr
   with_legacy: true
+- name: mgr_client_bytes_test
+  type: size
+  level: dev
+  default: 128_M
+  services:
+  - mgr
