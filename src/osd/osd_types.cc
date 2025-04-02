@@ -15,6 +15,9 @@
  *
  */
 
+#include "osd_types.h"
+#include "osd_perf_counters.h"
+
 #include <algorithm>
 #include <list>
 #include <map>
@@ -31,15 +34,18 @@
 #include "include/ceph_features.h"
 #include "include/encoding.h"
 #include "include/stringify.h"
+
+#include "crush/CrushWrapper.h"
 extern "C" {
+#include "crush/crush.h" // for CRUSH_ITEM_NONE
 #include "crush/hash.h"
 }
 
+#include "common/ceph_context.h"
 #include "common/Formatter.h"
 #include "common/StackStringStream.h"
 #include "include/utime_fmt.h"
 #include "OSDMap.h"
-#include "osd_types.h"
 #include "osd_types_fmt.h"
 #include "os/Transaction.h"
 
@@ -1499,7 +1505,7 @@ void pool_opts_t::encode(ceph::buffer::list& bl, uint64_t features) const
 
 void pool_opts_t::decode(ceph::buffer::list::const_iterator& bl)
 {
-  DECODE_START(1, bl);
+  DECODE_START(2, bl);
   __u32 n;
   decode(n, bl);
   opts.clear();
@@ -3743,7 +3749,7 @@ void pg_notify_t::encode(ceph::buffer::list &bl) const
 
 void pg_notify_t::decode(ceph::buffer::list::const_iterator &bl)
 {
-  DECODE_START(3, bl);
+  DECODE_START(4, bl);
   decode(query_epoch, bl);
   decode(epoch_sent, bl);
   decode(info, bl);
@@ -4595,7 +4601,7 @@ void ObjectModDesc::visit(Visitor *visitor) const
   auto bp = bl.cbegin();
   try {
     while (!bp.end()) {
-      DECODE_START(max_required_version, bp);
+      DECODE_START_UNCHECKED(max_required_version, bp);
       uint8_t code;
       decode(code, bp);
       switch (code) {

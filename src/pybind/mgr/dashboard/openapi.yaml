@@ -1692,6 +1692,10 @@ paths:
           application/json:
             schema:
               properties:
+                data_pool:
+                  type: string
+                metadata_pool:
+                  type: string
                 name:
                   type: string
                 service_spec:
@@ -8508,6 +8512,7 @@ paths:
             schema:
               properties:
                 enable_ha:
+                  default: true
                   description: Enable high availability
                   type: boolean
                 gw_group:
@@ -8522,7 +8527,6 @@ paths:
                   type: string
               required:
               - nqn
-              - enable_ha
               type: object
       responses:
         '201':
@@ -11040,6 +11044,11 @@ paths:
         \ detailed account info.\n        - If detailed=False, returns only account\
         \ ids.\n        "
       parameters:
+      - allowEmptyValue: true
+        in: query
+        name: daemon_name
+        schema:
+          type: string
       - default: false
         in: query
         name: detailed
@@ -11076,6 +11085,9 @@ paths:
               properties:
                 account_name:
                   description: Account name
+                  type: string
+                daemon_name:
+                  description: Name of the daemon
                   type: string
                 email:
                   description: Email
@@ -11137,6 +11149,12 @@ paths:
         required: true
         schema:
           type: string
+      - allowEmptyValue: true
+        description: Name of the daemon
+        in: query
+        name: daemon_name
+        schema:
+          type: string
       responses:
         '202':
           content:
@@ -11169,6 +11187,12 @@ paths:
         in: path
         name: account_id
         required: true
+        schema:
+          type: string
+      - allowEmptyValue: true
+        description: Name of the daemon
+        in: query
+        name: daemon_name
         schema:
           type: string
       responses:
@@ -11209,6 +11233,9 @@ paths:
               properties:
                 account_name:
                   description: Account name
+                  type: string
+                daemon_name:
+                  description: Name of the daemon
                   type: string
                 email:
                   description: Email
@@ -11607,6 +11634,11 @@ paths:
         name: owner
         schema:
           type: string
+      - allowEmptyValue: true
+        in: query
+        name: tenant
+        schema:
+          type: string
       responses:
         '200':
           content:
@@ -11642,6 +11674,8 @@ paths:
                   default: ''
                   type: string
                 owner:
+                  type: string
+                tenant:
                   type: string
               type: object
       responses:
@@ -13203,6 +13237,11 @@ paths:
               properties:
                 access_key:
                   type: string
+                account_id:
+                  type: integer
+                account_root_user:
+                  default: false
+                  type: integer
                 daemon_name:
                   type: string
                 display_name:
@@ -13384,6 +13423,11 @@ paths:
           application/json:
             schema:
               properties:
+                account_id:
+                  type: integer
+                account_root_user:
+                  default: false
+                  type: integer
                 daemon_name:
                   type: string
                 display_name:

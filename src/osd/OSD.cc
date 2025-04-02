@@ -13,10 +13,13 @@
  *
  */
 
+#include "OSD.h"
+
 #include "acconfig.h"
 
 #include <cctype>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <iterator>
 
@@ -45,7 +48,6 @@
 #include "include/random.h"
 #include "include/scope_guard.h"
 
-#include "OSD.h"
 #include "OSDMap.h"
 #include "Watch.h"
 #include "osdc/Objecter.h"
@@ -54,6 +56,7 @@
 #include "common/ceph_argparse.h"
 #include "common/ceph_releases.h"
 #include "common/ceph_time.h"
+#include "common/debug.h"
 #include "common/version.h"
 #include "common/async/blocked_completion.h"
 #include "common/pick_address.h"
@@ -124,6 +127,7 @@
 #include "global/pidfile.h"
 
 #include "include/color.h"
+#include "log/Log.h"
 #include "perfglue/cpu_profiler.h"
 #include "perfglue/heap_profiler.h"
 
@@ -2134,6 +2138,7 @@ void OSD::write_superblock(CephContext* cct, OSDSuperblock& sb, ObjectStore::Tra
 
   bufferlist bl;
   encode(sb, bl);
+  t.truncate(coll_t::meta(), OSD_SUPERBLOCK_GOBJECT, 0);
   t.write(coll_t::meta(), OSD_SUPERBLOCK_GOBJECT, 0, bl.length(), bl);
   std::map<std::string, ceph::buffer::list> attrs;
   attrs.emplace(OSD_SUPERBLOCK_OMAP_KEY, bl);
@@ -4705,6 +4710,9 @@ int OSD::shutdown()
     // then, wait on osd_op_tp to drain (TBD: should probably add a timeout)
     osd_op_tp.drain();
     osd_op_tp.stop();
+
+    dout(10) << "stopping agent" << dendl;
+    service.agent_stop();
 
     utime_t  start_time_umount = ceph_clock_now();
     store->prepare_for_fast_shutdown();

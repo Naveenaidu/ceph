@@ -15,15 +15,19 @@
  *
  */
 
+#include "OSDMap.h"
+
 #include <algorithm>
 #include <bit>
+#include <iomanip>
 #include <optional>
 #include <random>
+#include <sstream>
 #include <fmt/format.h>
 
 #include <boost/algorithm/string.hpp>
 
-#include "OSDMap.h"
+#include "common/ceph_context.h"
 #include "common/config.h"
 #include "common/errno.h"
 #include "common/Formatter.h"
@@ -942,7 +946,7 @@ void OSDMap::Incremental::decode(ceph::buffer::list::const_iterator& bl)
   }
 
   {
-    DECODE_START(10, bl); // extended, osd-only data
+    DECODE_START(12, bl); // extended, osd-only data
     decode(new_hb_back_up, bl);
     decode(new_up_thru, bl);
     decode(new_last_clean_interval, bl);
@@ -3637,7 +3641,7 @@ void OSDMap::decode(ceph::buffer::list::const_iterator& bl)
   }
 
   {
-    DECODE_START(10, bl); // extended, osd-only data
+    DECODE_START(12, bl); // extended, osd-only data
     decode(osd_addrs->hb_back_addrs, bl);
     decode(osd_info, bl);
     decode(blocklist, bl);
