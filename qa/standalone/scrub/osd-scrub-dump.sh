@@ -130,6 +130,17 @@ function rm_object()
   return 0
 }
 
+function modify_oi()
+{
+  local dir=$1
+  local target_osd=$2
+  local obj=$3
+  local oi_name="${obj}-oi"
+  ceph-objectstore-tool --data-path $dir/$targest_osd $obj get-attr '_' > $dir/$obj-oi
+  ceph-dencoder type object_info_t import $dir/$obj-oi decode dump_json
+}
+
+
 
 # applying the manipulators to objects of a specific OSD
 
@@ -489,132 +500,132 @@ function corrupt_and_measure()
 
   sleep 6
 
-  # ---------------------------  step 3: scrub & measure -------------------------------
+  # # ---------------------------  step 3: scrub & measure -------------------------------
 
-  # set the scrub parameters and the update frequency for low latencies
-  ceph tell osd.* config set osd_scrub_sleep "0"
-  ceph tell osd.* config set osd_max_scrubs 3  # for now, only 3 scrubs at a time
-  ceph tell osd.* config set osd_stats_update_period_not_scrubbing 1
-  ceph tell osd.* config set osd_stats_update_period_scrubbing 1
-  ceph tell osd.* config set osd_scrub_chunk_max 5
-  ceph tell osd.* config set osd_shallow_scrub_chunk_max 5
-  ceph tell osd.* config set osd_scrub_backoff_ratio 0.9999
+  # # set the scrub parameters and the update frequency for low latencies
+  # ceph tell osd.* config set osd_scrub_sleep "0"
+  # ceph tell osd.* config set osd_max_scrubs 3  # for now, only 3 scrubs at a time
+  # ceph tell osd.* config set osd_stats_update_period_not_scrubbing 1
+  # ceph tell osd.* config set osd_stats_update_period_scrubbing 1
+  # ceph tell osd.* config set osd_scrub_chunk_max 5
+  # ceph tell osd.* config set osd_shallow_scrub_chunk_max 5
+  # ceph tell osd.* config set osd_scrub_backoff_ratio 0.9999
 
-  # no auto-repair
-  ceph tell osd.* config set osd_scrub_auto_repair false
-  sleep 1
+  # # no auto-repair
+  # ceph tell osd.* config set osd_scrub_auto_repair false
+  # sleep 1
 
-  #create the dictionary of the PGs in the pool
-  local start_stdict=$(date +%s%N)
-  echo "Pre standard dict creation: $(date +%T.%N)"
-  declare -A pg_pr
-  declare -A pg_ac
-  declare -A pg_po
-  build_pg_dicts "$dir" pg_pr pg_ac pg_po "-"
-  local end_stdict=$(date +%s%N)
-  echo "Post standard dict creation: $(date +%T.%N) ($(( (end_stdict - start_stdict)/1000000 )) ms)"
-  (( extr_dbg >= 2 )) && echo "PGs table:"
-  for pg in "${!pg_pr[@]}"; do
-    #wait_for_pg_clean $pg || return 1
-    (( extr_dbg >= 2 )) && echo "Got: $pg: ${pg_pr[$pg]} ( ${pg_ac[$pg]} ) ${pg_po[$pg]}"
-  done
+  # #create the dictionary of the PGs in the pool
+  # local start_stdict=$(date +%s%N)
+  # echo "Pre standard dict creation: $(date +%T.%N)"
+  # declare -A pg_pr
+  # declare -A pg_ac
+  # declare -A pg_po
+  # build_pg_dicts "$dir" pg_pr pg_ac pg_po "-"
+  # local end_stdict=$(date +%s%N)
+  # echo "Post standard dict creation: $(date +%T.%N) ($(( (end_stdict - start_stdict)/1000000 )) ms)"
+  # (( extr_dbg >= 2 )) && echo "PGs table:"
+  # for pg in "${!pg_pr[@]}"; do
+  #   #wait_for_pg_clean $pg || return 1
+  #   (( extr_dbg >= 2 )) && echo "Got: $pg: ${pg_pr[$pg]} ( ${pg_ac[$pg]} ) ${pg_po[$pg]}"
+  # done
 
-  local -A saved_last_stamp
-  collect_pool_stamps $dir "$poolid" saved_last_stamp
-  ceph pg dump pgs
+  # local -A saved_last_stamp
+  # collect_pool_stamps $dir "$poolid" saved_last_stamp
+  # ceph pg dump pgs
 
-  ceph tell osd.* config set debug_osd 10/10
-  local start_time=$(date +%s%N)
-  for pg in "${!pg_pr[@]}"; do
-    (( extr_dbg >= 1 )) && echo "deep-scrub $pg"
-    ceph pg $pg deep-scrub || return 1
-  done
+  # ceph tell osd.* config set debug_osd 10/10
+  # local start_time=$(date +%s%N)
+  # for pg in "${!pg_pr[@]}"; do
+  #   (( extr_dbg >= 1 )) && echo "deep-scrub $pg"
+  #   ceph pg $pg deep-scrub || return 1
+  # done
 
-  # wait for the scrubs to complete
-  wait_for_pool_scrubbed "$dir" "$poolid" saved_last_stamp
+  # # wait for the scrubs to complete
+  # wait_for_pool_scrubbed "$dir" "$poolid" saved_last_stamp
 
-  local end_time=$(date +%s%N)
-  local duration=$(( (end_time - start_time)/1000000 ))
-  ceph tell osd.* config set debug_osd 20/20
+  # local end_time=$(date +%s%N)
+  # local duration=$(( (end_time - start_time)/1000000 ))
+  # ceph tell osd.* config set debug_osd 20/20
 
-  sleep 2
-  ceph pg dump pgs
-  printf 'MSR NAUT %3d %3d %3d %3d/%3d %6d\n' "$OSDS" "$PGS" "$OBJS_PER_PG" \
-                      "$modify_as_prim_cnt" "$modify_as_repl_cnt" "$duration"
-  for pg in "${!pg_pr[@]}"; do
-    echo "list-inconsistent for PG $pg"
-    rados -p $poolname list-inconsistent-obj $pg --format=json-pretty | jq '.' | wc -l
-  done
-  for ((osd=0; osd<OSDS; osd++)); do
-    ceph pg ls-by-osd $osd
-  done
+  # sleep 2
+  # ceph pg dump pgs
+  # printf 'MSR NAUT %3d %3d %3d %3d/%3d %6d\n' "$OSDS" "$PGS" "$OBJS_PER_PG" \
+  #                     "$modify_as_prim_cnt" "$modify_as_repl_cnt" "$duration"
+  # for pg in "${!pg_pr[@]}"; do
+  #   echo "list-inconsistent for PG $pg"
+  #   rados -p $poolname list-inconsistent-obj $pg --format=json-pretty | jq '.' | wc -l
+  # done
+  # for ((osd=0; osd<OSDS; osd++)); do
+  #   ceph pg ls-by-osd $osd
+  # done
 
-  # ---------------------------  step 4: repair -------------------------------
+  # # ---------------------------  step 4: repair -------------------------------
 
-  ## if testing 'auto-repair' instead of 'repair' - uncomment the next line.
-  ## And if running a pre-Tentacle version: uncomment the following line
-  ## as well, to workaround a bug.
-  #ceph tell osd.* config set osd_scrub_auto_repair true
-  #ceph tell osd.* config set osd_scrub_auto_repair_num_errors 1000
-  sleep 5
-  (( extr_dbg >= 3 )) && ceph pg dump pgs --format=json-pretty | jq '.pg_stats[]' > /tmp/pg_stats.json
-  (( extr_dbg >= 3 )) && ceph pg dump pgs --format=json-pretty | jq '.pg_stats[] |
-                         select(.state | contains("inconsistent"))' >> /tmp/pg_stats_inconsistent.json
+  # ## if testing 'auto-repair' instead of 'repair' - uncomment the next line.
+  # ## And if running a pre-Tentacle version: uncomment the following line
+  # ## as well, to workaround a bug.
+  # #ceph tell osd.* config set osd_scrub_auto_repair true
+  # #ceph tell osd.* config set osd_scrub_auto_repair_num_errors 1000
+  # sleep 5
+  # (( extr_dbg >= 3 )) && ceph pg dump pgs --format=json-pretty | jq '.pg_stats[]' > /tmp/pg_stats.json
+  # (( extr_dbg >= 3 )) && ceph pg dump pgs --format=json-pretty | jq '.pg_stats[] |
+  #                        select(.state | contains("inconsistent"))' >> /tmp/pg_stats_inconsistent.json
 
-  collect_pool_stamps $dir "$poolid" saved_last_stamp
-  ceph tell osd.* config set debug_osd 10/10
-  start_time=$(date +%s%N)
-  for pg in "${!pg_pr[@]}"; do
-    ceph pg repair  $pg || return 1
-    ## or, if auto-repairing:
-    #ceph pg $pg deep-scrub || return 1
-  done
-  wait_for_pool_scrubbed "$dir" "$poolid" saved_last_stamp
-  end_time=$(date +%s%N)
-  duration=$(( (end_time - start_time)/1000000 ))
-  ceph tell osd.* config set debug_osd 20/20
+  # collect_pool_stamps $dir "$poolid" saved_last_stamp
+  # ceph tell osd.* config set debug_osd 10/10
+  # start_time=$(date +%s%N)
+  # for pg in "${!pg_pr[@]}"; do
+  #   ceph pg repair  $pg || return 1
+  #   ## or, if auto-repairing:
+  #   #ceph pg $pg deep-scrub || return 1
+  # done
+  # wait_for_pool_scrubbed "$dir" "$poolid" saved_last_stamp
+  # end_time=$(date +%s%N)
+  # duration=$(( (end_time - start_time)/1000000 ))
+  # ceph tell osd.* config set debug_osd 20/20
 
-  sleep 5
-  ceph pg dump pgs
-  printf 'MSR REPR %3d %3d %3d %3d/%3d %6d\n' "$OSDS" "$PGS" "$OBJS_PER_PG" \
-                     "$modify_as_prim_cnt" "$modify_as_repl_cnt" "$duration"
-  dump_scrub_counters "$dir" "$OSDS" "After repair"
+  # sleep 5
+  # ceph pg dump pgs
+  # printf 'MSR REPR %3d %3d %3d %3d/%3d %6d\n' "$OSDS" "$PGS" "$OBJS_PER_PG" \
+  #                    "$modify_as_prim_cnt" "$modify_as_repl_cnt" "$duration"
+  # dump_scrub_counters "$dir" "$OSDS" "After repair"
 
-  # -- collecting some data after the repair
+  # # -- collecting some data after the repair
 
-  for pg in "${!pg_pr[@]}"; do
-    incon_lines=$(rados -p $poolname list-inconsistent-obj $pg --format=json-pretty | jq '.' | wc -l)
-    if [ "$incon_lines" -gt 5 ]; then
-      echo "PG $pg still seems to have $incon_lines inconsistent objects!!!!"
-      # for some reason, the list-inconsistent does not get fully updated immediately
-      # (10 seconds, for example, are not enough)
-      # return 1
-    fi
-  done
+  # for pg in "${!pg_pr[@]}"; do
+  #   incon_lines=$(rados -p $poolname list-inconsistent-obj $pg --format=json-pretty | jq '.' | wc -l)
+  #   if [ "$incon_lines" -gt 5 ]; then
+  #     echo "PG $pg still seems to have $incon_lines inconsistent objects!!!!"
+  #     # for some reason, the list-inconsistent does not get fully updated immediately
+  #     # (10 seconds, for example, are not enough)
+  #     # return 1
+  #   fi
+  # done
 
-  for ((osd=0; osd<OSDS; osd++)); do
-    ceph pg ls-by-osd $osd
-  done
-  wait_for_clean || return 1
-  ceph pg dump pgs
+  # for ((osd=0; osd<OSDS; osd++)); do
+  #   ceph pg ls-by-osd $osd
+  # done
+  # wait_for_clean || return 1
+  # ceph pg dump pgs
 
-  # ---------------------------  step 5: re-scrub, expecting no errors --------
+  # # ---------------------------  step 5: re-scrub, expecting no errors --------
 
 
-  collect_pool_stamps $dir "$poolid" saved_last_stamp
-  start_time=$(date +%s%N)
-  for pg in "${!pg_pr[@]}"; do
-    ceph pg deep-scrub  $pg || return 1
-  done
-  wait_for_pool_scrubbed "$dir" "$poolid" saved_last_stamp
-  end_time=$(date +%s%N)
-  duration=$(( (end_time - start_time)/1000000 ))
-  printf 'MSR REDE %3d %3d %3d %3d/%3d %6d\n' "$OSDS" "$PGS" "$OBJS_PER_PG" \
-                     "$modify_as_prim_cnt" "$modify_as_repl_cnt" "$duration"
-  sleep 3
-  ceph pg dump pgs
-  dump_scrub_counters "$dir" "$OSDS" "Final"
-  return 0
+  # collect_pool_stamps $dir "$poolid" saved_last_stamp
+  # start_time=$(date +%s%N)
+  # for pg in "${!pg_pr[@]}"; do
+  #   ceph pg deep-scrub  $pg || return 1
+  # done
+  # wait_for_pool_scrubbed "$dir" "$poolid" saved_last_stamp
+  # end_time=$(date +%s%N)
+  # duration=$(( (end_time - start_time)/1000000 ))
+  # printf 'MSR REDE %3d %3d %3d %3d/%3d %6d\n' "$OSDS" "$PGS" "$OBJS_PER_PG" \
+  #                    "$modify_as_prim_cnt" "$modify_as_repl_cnt" "$duration"
+  # sleep 3
+  # ceph pg dump pgs
+  # dump_scrub_counters "$dir" "$OSDS" "Final"
+  # return 0
 }
 
 
@@ -634,6 +645,22 @@ function TEST_time_measurements_basic_1()
     ['modify_as_prim_cnt']="24" # elements to corrupt their Primary version
     ['modify_as_repl_cnt']="24" # elements to corrupt one of their replicas
     ['manipulations']="delete_oi"
+  )
+  corrupt_and_measure "$1" cls_conf || return 1
+}
+
+function TEST_modobj_1()
+{
+  local -A cls_conf=(
+    ['osds_num']="3"
+    ['pgs_in_pool']="4"
+    ['pool_name']="test"
+    ['pool_default_size']="3"
+    ['msg']="mod1"
+    ['objects_per_pg']="16"
+    ['modify_as_prim_cnt']="2"
+    ['modify_as_repl_cnt']="2"
+    ['manipulations']="modify_oi"
   )
   corrupt_and_measure "$1" cls_conf || return 1
 }
