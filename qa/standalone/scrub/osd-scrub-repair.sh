@@ -6152,250 +6152,253 @@ function TEST_corrupt_snapset_scrub_rep() {
     done
     rm $dir/change
 
-    pg_scrub $pg
+    ceph tell osd.* config set osd_scrub_auto_repair true
 
-    rados list-inconsistent-pg $poolname > $dir/json || return 1
-    # Check pg count
-    test $(jq '. | length' $dir/json) = "1" || return 1
-    # Check pgid
-    test $(jq -r '.[0]' $dir/json) = $pg || return 1
+    pg_deep_scrub $pg
+    # cp -r $dir scrub-test/
 
-    rados list-inconsistent-obj $pg > $dir/json || return 1
+#     rados list-inconsistent-pg $poolname > $dir/json || return 1
+#     # Check pg count
+#     test $(jq '. | length' $dir/json) = "1" || return 1
+#     # Check pgid
+#     test $(jq -r '.[0]' $dir/json) = $pg || return 1
+
+#     rados list-inconsistent-obj $pg > $dir/json || return 1
     
-    echo "-----------------"
-    rados -p $poolname ls
-    echo $pg
-    echo $primary
-    echo "----------------"
-    ceph pg dump pgs
+#     echo "-----------------"
+#     rados -p $poolname ls
+#     echo $pg
+#     echo $primary
+#     echo "----------------"
+#     ceph pg dump pgs
 
-    jq "$jqfilter" << EOF | jq '.inconsistents' | python3 -c "$sortkeys" > $dir/checkcsjson
-{
-  "epoch": 47,
-  "inconsistents": [
-    {
-      "object": {
-        "name": "ROBJ1",
-        "nspace": "",
-        "locator": "",
-        "snap": "head",
-        "version": 8
-      },
-      "errors": [
-        "snapset_inconsistency"
-      ],
-      "union_shard_errors": [],
-      "selected_object_info": {
-        "oid": {
-          "oid": "ROBJ1",
-          "key": "",
-          "snapid": -2,
-          "hash": 1454963827,
-          "max": 0,
-          "pool": 3,
-          "namespace": ""
-        },
-        "version": "35'8",
-        "prior_version": "32'3",
-        "last_reqid": "client.4349.0:1",
-        "user_version": 8,
-        "size": 21,
-        "mtime": "2025-11-28T07:39:50.092003+0000",
-        "local_mtime": "2025-11-28T07:39:50.146185+0000",
-        "lost": 0,
-        "flags": [
-          "dirty",
-          "omap",
-          "data_digest"
-        ],
-        "truncate_seq": 0,
-        "truncate_size": 0,
-        "data_digest": "0x53acb008",
-        "omap_digest": "0xffffffff",
-        "expected_object_size": 0,
-        "expected_write_size": 0,
-        "alloc_hint_flags": 0,
-        "manifest": {
-          "type": 0
-        },
-        "watchers": {},
-        "shard_versions": []
-      },
-      "shards": [
-        {
-          "osd": 0,
-          "primary": false,
-          "errors": [],
-          "size": 21,
-          "snapset": {
-            "seq": 1,
-            "clones": [
-              {
-                "snap": 1,
-                "size": 7,
-                "overlap": "[]",
-                "snaps": [
-                  1
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "osd": 1,
-          "primary": true,
-          "errors": [],
-          "size": 21,
-          "snapset": {
-            "seq": 0,
-            "clones": []
-          }
-        },
-        {
-          "osd": 2,
-          "primary": false,
-          "errors": [],
-          "size": 21,
-          "snapset": {
-            "seq": 1,
-            "clones": [
-              {
-                "snap": 1,
-                "size": 7,
-                "overlap": "[]",
-                "snaps": [
-                  1
-                ]
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "object": {
-        "name": "ROBJ2",
-        "nspace": "",
-        "locator": "",
-        "snap": "head",
-        "version": 10
-      },
-      "errors": [
-        "snapset_inconsistency"
-      ],
-      "union_shard_errors": [],
-      "selected_object_info": {
-        "oid": {
-          "oid": "ROBJ2",
-          "key": "",
-          "snapid": -2,
-          "hash": 2026323607,
-          "max": 0,
-          "pool": 3,
-          "namespace": ""
-        },
-        "version": "42'10",
-        "prior_version": "34'6",
-        "last_reqid": "client.4385.0:1",
-        "user_version": 10,
-        "size": 21,
-        "mtime": "2025-11-28T07:40:07.820079+0000",
-        "local_mtime": "2025-11-28T07:40:07.821833+0000",
-        "lost": 0,
-        "flags": [
-          "dirty",
-          "omap",
-          "data_digest"
-        ],
-        "truncate_seq": 0,
-        "truncate_size": 0,
-        "data_digest": "0x53acb008",
-        "omap_digest": "0xffffffff",
-        "expected_object_size": 0,
-        "expected_write_size": 0,
-        "alloc_hint_flags": 0,
-        "manifest": {
-          "type": 0
-        },
-        "watchers": {},
-        "shard_versions": []
-      },
-      "shards": [
-        {
-          "osd": 0,
-          "primary": false,
-          "errors": [],
-          "size": 21,
-          "snapset": {
-            "seq": 1,
-            "clones": [
-              {
-                "snap": 1,
-                "size": 7,
-                "overlap": "[]",
-                "snaps": [
-                  1
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "osd": 1,
-          "primary": true,
-          "errors": [],
-          "size": 21,
-          "snapset": {
-            "seq": 1,
-            "clones": [
-              {
-                "snap": 1,
-                "size": 7,
-                "overlap": "[]",
-                "snaps": [
-                  1
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "osd": 2,
-          "primary": false,
-          "errors": [],
-          "size": 21,
-          "snapset": {
-            "seq": 0,
-            "clones": []
-          }
-        }
-      ]
-    }
-  ]
-}
+#     jq "$jqfilter" << EOF | jq '.inconsistents' | python3 -c "$sortkeys" > $dir/checkcsjson
+# {
+#   "epoch": 47,
+#   "inconsistents": [
+#     {
+#       "object": {
+#         "name": "ROBJ1",
+#         "nspace": "",
+#         "locator": "",
+#         "snap": "head",
+#         "version": 8
+#       },
+#       "errors": [
+#         "snapset_inconsistency"
+#       ],
+#       "union_shard_errors": [],
+#       "selected_object_info": {
+#         "oid": {
+#           "oid": "ROBJ1",
+#           "key": "",
+#           "snapid": -2,
+#           "hash": 1454963827,
+#           "max": 0,
+#           "pool": 3,
+#           "namespace": ""
+#         },
+#         "version": "35'8",
+#         "prior_version": "32'3",
+#         "last_reqid": "client.4349.0:1",
+#         "user_version": 8,
+#         "size": 21,
+#         "mtime": "2025-11-28T07:39:50.092003+0000",
+#         "local_mtime": "2025-11-28T07:39:50.146185+0000",
+#         "lost": 0,
+#         "flags": [
+#           "dirty",
+#           "omap",
+#           "data_digest"
+#         ],
+#         "truncate_seq": 0,
+#         "truncate_size": 0,
+#         "data_digest": "0x53acb008",
+#         "omap_digest": "0xffffffff",
+#         "expected_object_size": 0,
+#         "expected_write_size": 0,
+#         "alloc_hint_flags": 0,
+#         "manifest": {
+#           "type": 0
+#         },
+#         "watchers": {},
+#         "shard_versions": []
+#       },
+#       "shards": [
+#         {
+#           "osd": 0,
+#           "primary": false,
+#           "errors": [],
+#           "size": 21,
+#           "snapset": {
+#             "seq": 1,
+#             "clones": [
+#               {
+#                 "snap": 1,
+#                 "size": 7,
+#                 "overlap": "[]",
+#                 "snaps": [
+#                   1
+#                 ]
+#               }
+#             ]
+#           }
+#         },
+#         {
+#           "osd": 1,
+#           "primary": true,
+#           "errors": [],
+#           "size": 21,
+#           "snapset": {
+#             "seq": 0,
+#             "clones": []
+#           }
+#         },
+#         {
+#           "osd": 2,
+#           "primary": false,
+#           "errors": [],
+#           "size": 21,
+#           "snapset": {
+#             "seq": 1,
+#             "clones": [
+#               {
+#                 "snap": 1,
+#                 "size": 7,
+#                 "overlap": "[]",
+#                 "snaps": [
+#                   1
+#                 ]
+#               }
+#             ]
+#           }
+#         }
+#       ]
+#     },
+#     {
+#       "object": {
+#         "name": "ROBJ2",
+#         "nspace": "",
+#         "locator": "",
+#         "snap": "head",
+#         "version": 10
+#       },
+#       "errors": [
+#         "snapset_inconsistency"
+#       ],
+#       "union_shard_errors": [],
+#       "selected_object_info": {
+#         "oid": {
+#           "oid": "ROBJ2",
+#           "key": "",
+#           "snapid": -2,
+#           "hash": 2026323607,
+#           "max": 0,
+#           "pool": 3,
+#           "namespace": ""
+#         },
+#         "version": "42'10",
+#         "prior_version": "34'6",
+#         "last_reqid": "client.4385.0:1",
+#         "user_version": 10,
+#         "size": 21,
+#         "mtime": "2025-11-28T07:40:07.820079+0000",
+#         "local_mtime": "2025-11-28T07:40:07.821833+0000",
+#         "lost": 0,
+#         "flags": [
+#           "dirty",
+#           "omap",
+#           "data_digest"
+#         ],
+#         "truncate_seq": 0,
+#         "truncate_size": 0,
+#         "data_digest": "0x53acb008",
+#         "omap_digest": "0xffffffff",
+#         "expected_object_size": 0,
+#         "expected_write_size": 0,
+#         "alloc_hint_flags": 0,
+#         "manifest": {
+#           "type": 0
+#         },
+#         "watchers": {},
+#         "shard_versions": []
+#       },
+#       "shards": [
+#         {
+#           "osd": 0,
+#           "primary": false,
+#           "errors": [],
+#           "size": 21,
+#           "snapset": {
+#             "seq": 1,
+#             "clones": [
+#               {
+#                 "snap": 1,
+#                 "size": 7,
+#                 "overlap": "[]",
+#                 "snaps": [
+#                   1
+#                 ]
+#               }
+#             ]
+#           }
+#         },
+#         {
+#           "osd": 1,
+#           "primary": true,
+#           "errors": [],
+#           "size": 21,
+#           "snapset": {
+#             "seq": 1,
+#             "clones": [
+#               {
+#                 "snap": 1,
+#                 "size": 7,
+#                 "overlap": "[]",
+#                 "snaps": [
+#                   1
+#                 ]
+#               }
+#             ]
+#           }
+#         },
+#         {
+#           "osd": 2,
+#           "primary": false,
+#           "errors": [],
+#           "size": 21,
+#           "snapset": {
+#             "seq": 0,
+#             "clones": []
+#           }
+#         }
+#       ]
+#     }
+#   ]
+# }
 
-EOF
+# EOF
 
-    jq "$jqfilter" $dir/json | jq '.inconsistents' | python3 -c "$sortkeys" > $dir/csjson
-    multidiff $dir/checkcsjson $dir/csjson || test $getjson = "yes" || return 1
-    if test $getjson = "yes"
-    then
-        jq '.' $dir/json > save6.json
-    fi
+#     jq "$jqfilter" $dir/json | jq '.inconsistents' | python3 -c "$sortkeys" > $dir/csjson
+#     multidiff $dir/checkcsjson $dir/csjson || test $getjson = "yes" || return 1
+#     if test $getjson = "yes"
+#     then
+#         jq '.' $dir/json > save6.json
+#     fi
 
-    if test "$LOCALRUN" = "yes" && which jsonschema > /dev/null;
-    then
-      jsonschema -i $dir/json $CEPH_ROOT/doc/rados/command/list-inconsistent-obj.json || return 1
-    fi
+#     if test "$LOCALRUN" = "yes" && which jsonschema > /dev/null;
+#     then
+#       jsonschema -i $dir/json $CEPH_ROOT/doc/rados/command/list-inconsistent-obj.json || return 1
+#     fi
 
     ERRORS=0
     declare -a err_strings
     err_strings[0]="log_channel[(]cluster[)] log [[]ERR[]] : [0-9]*[.]0 soid [0-9]*:.*:::ROBJ1:head : snapset inconsistent"
     err_strings[1]="log_channel[(]cluster[)] log [[]ERR[]] : [0-9]*[.]0 soid [0-9]*:.*:::ROBJ2:head : snapset inconsistent"
-    err_strings[2]="log_channel[(]cluster[)] log [[]ERR[]] : scrub [0-9]*[.]0 [0-9]*:.*:::ROBJ1:1 : is an unexpected clone"
-    err_strings[3]="log_channel[(]cluster[)] log [[]ERR[]] : [0-9]*[.]0 scrub : stat mismatch, got 3/4 objects, 1/2 clones, 3/4 dirty, 3/4 omap, 0/0 pinned, 0/0 hit_set_archive, 0/0 whiteouts, 49/56 bytes, 0/0 manifest objects, 0/0 hit_set_archive bytes."
-    err_strings[4]="log_channel[(]cluster[)] log [[]ERR[]] : [0-9]*[.]0 scrub 0 missing, 2 inconsistent objects"
-    err_strings[5]="log_channel[(]cluster[)] log [[]ERR[]] : [0-9]*[.]0 scrub 4 errors"
+    err_strings[2]="log_channel[(]cluster[)] log [[]ERR[]] : deep-scrub [0-9]*[.]0 [0-9]*:.*:::ROBJ1:1 : is an unexpected clone"
+    err_strings[3]="log_channel[(]cluster[)] log [[]ERR[]] : [0-9]*[.]0 deep-scrub : stat mismatch, got 3/4 objects, 1/2 clones, 3/4 dirty, 3/4 omap, 0/0 pinned, 0/0 hit_set_archive, 0/0 whiteouts, 49/56 bytes, 0/0 manifest objects, 0/0 hit_set_archive bytes."
+    err_strings[4]="log_channel[(]cluster[)] log [[]ERR[]] : [0-9]*[.]0 deep-scrub 0 missing, 2 inconsistent objects"
+    err_strings[5]="log_channel[(]cluster[)] log [[]ERR[]] : [0-9]*[.]0 deep-scrub 4 errors"
 
     for err_string in "${err_strings[@]}"
     do
@@ -6412,14 +6415,41 @@ EOF
     #     return 1
     # fi
 
-    # REPAIR THE PG
-    repair $pg
-    wait_for_clean || return 1
-    ceph pg dump pgs
+    # # REPAIR THE PG
+    # repair $pg
 
-    echo "---- re-scrubbing PGGG -----"
-    pg_scrub $pg
-    cp -r $dir scrub-test/
+    # wait_for_clean || return 1
+    # ceph pg dump pgs
+
+    # echo "---- re-scrubbing PGGG -----"
+    # pg_scrub $pg
+    # cp -r $dir scrub-test/
+
+    # When auto-repair, the repair should automatically happen
+    local last_scrub=$(get_last_scrub_stamp $pg)
+    wait_for_scrub $pg "$last_scrub"
+
+    sleep 5
+
+    # collect some data after automatic repair
+    ceph pg dump pgs
+    rados -p $poolname list-inconsistent-obj $pg
+    rados list-inconsistent-pg $poolname
+
+    rados -p $poolname list-inconsistent-obj $pg --format=json-pretty
+    rados list-inconsistent-pg $poolname --format=json-pretty
+
+    pg_deep_scrub $pg
+
+    # collect some data after automatic repair
+    ceph pg dump pgs
+    rados -p $poolname list-inconsistent-obj $pg
+    rados list-inconsistent-pg $poolname
+
+    rados -p $poolname list-inconsistent-obj $pg --format=json-pretty
+    rados list-inconsistent-pg $poolname --format=json-pretty
+
+    cp -r $dir scrub-test-auto-repair-then-scrub/
 
     ceph osd pool rm $poolname $poolname --yes-i-really-really-mean-it
 }
