@@ -20,6 +20,7 @@
 #include <fstream>
 #include <string>
 #include <iterator>
+#include <iostream>
 
 #include "ceph_ver.h"
 #include "common/ceph_strings.h"
@@ -49,15 +50,16 @@ const char *git_version_to_str(void)
 
 static std::string read_vendor_release_file()
 {
-  auto filename = "/etc/ceph_version/";
+  auto filename = "/etc/ceph_version";
   std::ifstream file(filename);
 
   if(!file.is_open()){
+    std::cout << "File unable to open" << std::endl;
     return "";
   }
 
   std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-  if (!content.is_empty()) {
+  if (!content.empty()) {
     return std::string(" release ") + content;
   }
 
