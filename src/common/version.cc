@@ -20,7 +20,7 @@
 #include <fstream>
 #include <string>
 #include <iterator>
-#include <iostream>
+
 
 #include "ceph_ver.h"
 #include "common/ceph_strings.h"
@@ -54,7 +54,6 @@ static std::string read_vendor_release_file()
   std::ifstream file(filename);
 
   if(!file.is_open()){
-    std::cout << "File unable to open" << std::endl;
     return "";
   }
 
