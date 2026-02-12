@@ -66,6 +66,24 @@ static std::string read_vendor_release_file()
 
 }
 
+static std::string read_vendor_release_file_dummy()
+{
+  auto filename = "/etc/issue";
+  std::ifstream file(filename);
+
+  if(!file.is_open()){
+    return "";
+  }
+
+  std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  if (!content.empty()) {
+    return std::string(" test_dummy ") + content;
+  }
+
+  return "";
+
+}
+
 std::string const pretty_version_to_str(void)
 {
   std::ostringstream oss;
@@ -78,6 +96,7 @@ std::string const pretty_version_to_str(void)
       << " (crimson)"
 #endif
       << read_vendor_release_file()
+      << read_vendor_release_file_dummy()
       ;
   return oss.str();
 }
