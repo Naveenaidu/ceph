@@ -471,6 +471,9 @@ global_init(const std::map<std::string,std::string> *defaults,
     // cppcheck-suppress memleak
   }
 
+  ceph_set_vendor_version_file(
+    g_conf().get_val<std::string>("ceph_vendor_version_file"));
+
   if (code_env == CODE_ENVIRONMENT_DAEMON && !(flags & CINIT_FLAG_NO_DAEMON_ACTIONS))
     output_ceph_version();
 

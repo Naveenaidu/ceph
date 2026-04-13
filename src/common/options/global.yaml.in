@@ -6971,3 +6971,12 @@ options:
   flags:
   - no_mon_update
   - startup
+- name: ceph_vendor_version_file
+  type: str
+  level: advanced
+  desc: File where the vendor version information is fetched from
+  default: /usr/lib/ceph/ceph_vendor_version
+  services:
+  - common
+  flags:
+  - startup

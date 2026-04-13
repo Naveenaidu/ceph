@@ -28,6 +28,8 @@
 #define _STR(x) #x
 #define STRINGIFY(x) _STR(x)
 
+static std::string g_vendor_version;
+
 const char *ceph_version_to_str()
 {
   char* debug_version_for_testing = getenv("ceph_debug_version_for_testing");
@@ -48,30 +50,33 @@ const char *git_version_to_str(void)
   return STRINGIFY(CEPH_GIT_VER);
 }
 
-static std::string read_vendor_release_file()
+void ceph_set_vendor_version_file(const std::string& path)
 {
-  auto filename = "/etc/ceph_version";
-  std::ifstream file(filename);
-
-  if(!file.is_open()){
-    return "";
+  std::ifstream file(path);
+  if (!file.is_open()) {
+    g_vendor_version.clear();
+    return;
   }
 
   std::string content;
   try {
-    content.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+    content.assign(std::istreambuf_iterator<char>(file),
+                   std::istreambuf_iterator<char>());
   } catch (const std::exception &e) {
-    return "";
+    g_vendor_version.clear();
+    return;
   }
+
+  while (!content.empty() &&
+         (content.back() == '\n' || content.back() == '\r')) {
+    content.pop_back();
+  }
+
   if (!content.empty()) {
-    while (!content.empty() && (content.back() == '\n' || content.back() == '\r')) {
-      content.pop_back();
-    }
-    return std::string(" release ") + content;
+    g_vendor_version = " release " + content;
+  } else {
+    g_vendor_version.clear();
   }
-
-  return "";
-
 }
 
 std::string const pretty_version_to_str(void)
@@ -85,7 +90,7 @@ std::string const pretty_version_to_str(void)
 #ifdef WITH_CRIMSON
       << " (crimson)"
 #endif
-      << read_vendor_release_file()
+      << g_vendor_version
       ;
   return oss.str();
 }

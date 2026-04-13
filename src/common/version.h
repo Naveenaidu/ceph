@@ -33,4 +33,8 @@ std::string const pretty_version_to_str(void);
 // Release type ("dev", "rc", or "stable")
 const char *ceph_release_type(void);
 
+// Cache the vendor version string read from the configured file path.
+// Must be called once during CephContext initialization.
+void ceph_set_vendor_version_file(const std::string& path);
+
 #endif
