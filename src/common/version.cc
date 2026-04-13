@@ -29,6 +29,7 @@
 #define STRINGIFY(x) _STR(x)
 
 static std::string g_vendor_version;
+static constexpr size_t MAX_VENDOR_VERSION_SIZE = 256;
 
 const char *ceph_version_to_str()
 {
@@ -60,8 +61,14 @@ void ceph_set_vendor_version_file(const std::string& path)
 
   std::string content;
   try {
-    content.assign(std::istreambuf_iterator<char>(file),
-                   std::istreambuf_iterator<char>());
+    content.reserve(MAX_VENDOR_VERSION_SIZE);
+    for (std::istreambuf_iterator<char> it(file), end; it != end; ++it) {
+      if (content.size() == MAX_VENDOR_VERSION_SIZE) {
+        g_vendor_version.clear();
+        return;
+      }
+      content.push_back(*it);
+    }
   } catch (const std::exception &e) {
     g_vendor_version.clear();
     return;
