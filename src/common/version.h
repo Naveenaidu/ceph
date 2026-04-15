@@ -17,6 +17,7 @@
 #define CEPH_COMMON_VERSION_H
 
 #include <string>
+#include "include/common_fwd.h"
 
 // Return a string describing the Ceph version
 const char *ceph_version_to_str();
@@ -27,14 +28,11 @@ const char *ceph_release_to_str(void);
 // Return a string describing the git version
 const char *git_version_to_str(void);
 
-// Return a formatted string describing the ceph and git versions
-std::string const pretty_version_to_str(void);
+// Return a formatted string describing the ceph and git versions.
+// If cct is non-null, the vendor version string is appended.
+std::string const pretty_version_to_str(CephContext* cct = nullptr);
 
 // Release type ("dev", "rc", or "stable")
 const char *ceph_release_type(void);
-
-// Cache the vendor version string read from the configured file path.
-// Must be called once during CephContext initialization.
-void ceph_set_vendor_version_file(const std::string& path);
 
 #endif

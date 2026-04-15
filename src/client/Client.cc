@@ -2576,7 +2576,7 @@ void Client::populate_metadata(const std::string &mount_root)
   }
 
   // Ceph version
-  metadata["ceph_version"] = pretty_version_to_str();
+  metadata["ceph_version"] = pretty_version_to_str(cct);
   metadata["ceph_sha1"] = git_version_to_str();
 
   // Apply any metadata from the user's configured overrides

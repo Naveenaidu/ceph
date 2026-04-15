@@ -611,7 +611,7 @@ ceph_cluster_log(BaseMgrModule *self, PyObject *args)
 static PyObject *
 ceph_get_version(BaseMgrModule *self, PyObject *args)
 {
-  return PyUnicode_FromString(pretty_version_to_str().c_str());
+  return PyUnicode_FromString(pretty_version_to_str(g_ceph_context).c_str());
 }
 
 static PyObject *

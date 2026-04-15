@@ -2326,7 +2326,7 @@ int OSD::write_meta(CephContext *cct, ObjectStore *store, uuid_d& cluster_fsid, 
       return r;
   }
 
-  r = store->write_meta("ceph_version_when_created", pretty_version_to_str());
+  r = store->write_meta("ceph_version_when_created", pretty_version_to_str(cct));
   if (r < 0)
     return r;
 

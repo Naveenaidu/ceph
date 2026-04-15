@@ -16,6 +16,8 @@
 
 #include "common/ceph_context.h"
 
+#include <fstream>
+#include <iterator>
 #include <mutex>
 #include <iostream>
 #include <sstream>
@@ -815,6 +817,50 @@ CephContext::CephContext(uint32_t module_type_,
   _crypto_random.reset(new CryptoRandom());
 
   lookup_or_create_singleton_object<MempoolObs>("mempool_obs", false, this);
+}
+
+void CephContext::set_vendor_version_file(const std::string& path)
+{
+  static constexpr size_t MAX_VENDOR_VERSION_SIZE = 256;
+
+  // Clear the version initially so all failure paths safely default to empty
+  _vendor_version.clear();
+
+  std::ifstream file(path);
+  if (!file) {
+    return;
+  }
+
+  try {
+    // Allocate buffer to read up to MAX + 1 bytes to easily check for overflow
+    std::string content(MAX_VENDOR_VERSION_SIZE + 1, '\0');
+    
+    // Perform a single block read instead of iterating character-by-character
+    file.read(&content[0], content.size());
+    std::streamsize bytes_read = file.gcount();
+
+    // If we read more than the maximum allowed size, reject the file entirely
+    if (bytes_read > MAX_VENDOR_VERSION_SIZE) {
+      return;
+    }
+
+    // Shrink the string down to the actual number of bytes read
+    content.resize(bytes_read);
+
+    // Efficiently find and trim trailing newlines and carriage returns
+    size_t last_valid_char = content.find_last_not_of("\r\n");
+    if (last_valid_char == std::string::npos) {
+      return; // File was empty or contained only linebreaks
+    }
+
+    content.erase(last_valid_char + 1);
+    _vendor_version = " vendor " + content;
+
+  } catch (const std::exception& e) {
+    // If an exception (like std::bad_alloc) occurs, safely exit. 
+    // _vendor_version is already empty.
+    return;
+  }
 }
 
 void CephContext::modify_msgr_hook(

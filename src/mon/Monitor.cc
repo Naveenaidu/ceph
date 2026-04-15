@@ -4093,11 +4093,11 @@ void Monitor::handle_command(MonOpRequestRef op)
   } else if (prefix == "version") {
     if (f) {
       f->open_object_section("version");
-      f->dump_string("version", pretty_version_to_str());
+      f->dump_string("version", pretty_version_to_str(cct));
       f->close_section();
       f->flush(ds);
     } else {
-      ds << pretty_version_to_str();
+      ds << pretty_version_to_str(cct);
     }
     rdata.append(ds);
     rs = "";

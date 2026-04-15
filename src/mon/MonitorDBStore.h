@@ -705,7 +705,7 @@ class MonitorDBStore
   }
 
   int create_and_open(std::ostream &out) {
-    int r = write_meta("ceph_version_when_created", pretty_version_to_str());
+    int r = write_meta("ceph_version_when_created", pretty_version_to_str(g_ceph_context));
     if (r < 0)
       return r;
 

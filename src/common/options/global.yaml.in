@@ -6980,3 +6980,4 @@ options:
   - common
   flags:
   - startup
+  - no_mon_update

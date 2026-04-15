@@ -1331,7 +1331,7 @@ static int rbd_wnbd(int argc, const char *argv[])
     usage();
     return 0;
   } else if (r == VERSION_INFO) {
-    std::cout << pretty_version_to_str() << std::endl;
+    std::cout << pretty_version_to_str(g_ceph_context) << std::endl;
     return 0;
   } else if (r < 0) {
     std::cout << err_msg.str() << std::endl;

@@ -99,10 +99,15 @@ public:
   crimson::common::PerfCountersCollection& _perf_counters_collection;
   CephContext* get();
   void put();
+  void set_vendor_version_file(const std::string& path);
+  const std::string& get_vendor_version() const {
+    return _vendor_version;
+  }
 private:
   std::unique_ptr<CryptoRandom> _crypto_random;
   unsigned nref = 1;
   ceph::PluginRegistry* _plugin_registry;
+  std::string _vendor_version;
 };
 }
 #else
@@ -250,6 +255,11 @@ public:
     return _plugin_registry;
   }
 
+  void set_vendor_version_file(const std::string& path);
+  const std::string& get_vendor_version() const {
+    return _vendor_version;
+  }
+
   void set_uid_gid(uid_t u, gid_t g) {
     _set_uid = u;
     _set_gid = g;
@@ -320,6 +330,8 @@ private:
   uint32_t _module_type;
 
   int _init_flags;
+
+  std::string _vendor_version;
 
   uid_t _set_uid; ///< uid to drop privs to
   gid_t _set_gid; ///< gid to drop privs to

@@ -20,6 +20,7 @@
 #include "common/config.h"
 #include "common/strtol.h" // for strict_strtof()
 #include "common/version.h"
+#include "global/global_context.h" 
 #include "include/str_list.h"
 
 #include <sstream>
@@ -508,7 +509,7 @@ CephInitParameters ceph_argparse_early_args
       break;
     }
     else if (ceph_argparse_flag(args, i, "--version", "-v", (char*)NULL)) {
-      std::cout << pretty_version_to_str() << std::endl;
+      std::cout << pretty_version_to_str(g_ceph_context) << std::endl;
       _exit(0);
     }
     else if (ceph_argparse_witharg(args, i, &val, "--conf", "-c", (char*)NULL)) {

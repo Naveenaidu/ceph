@@ -69,7 +69,7 @@ static void output_ceph_version()
 {
   char buf[1024];
   snprintf(buf, sizeof(buf), "%s, process %s, pid %d",
-	   pretty_version_to_str().c_str(),
+	   pretty_version_to_str(g_ceph_context).c_str(),
 	   get_process_name_cpp().c_str(), getpid());
   generic_dout(0) << buf << dendl;
 }
@@ -471,7 +471,7 @@ global_init(const std::map<std::string,std::string> *defaults,
     // cppcheck-suppress memleak
   }
 
-  ceph_set_vendor_version_file(
+  g_ceph_context->set_vendor_version_file(
     g_conf().get_val<std::string>("ceph_vendor_version_file"));
 
   if (code_env == CODE_ENVIRONMENT_DAEMON && !(flags & CINIT_FLAG_NO_DAEMON_ACTIONS))

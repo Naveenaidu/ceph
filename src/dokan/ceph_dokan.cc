@@ -1089,7 +1089,7 @@ int main(int argc, const char** argv)
 
   switch (cmd) {
     case Command::Version:
-      std::cout << pretty_version_to_str() << std::endl;
+      std::cout << pretty_version_to_str(g_ceph_context) << std::endl;
       return 0;
     case Command::Help:
       print_usage();

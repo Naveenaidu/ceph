@@ -8,12 +8,13 @@
 #include "BackTrace.h"
 #include "common/version.h"
 #include "common/Formatter.h"
+#include "global/global_context.h"  
 
 namespace ceph {
 
 void ClibBackTrace::print(std::ostream& out) const
 {
-  out << " " << pretty_version_to_str() << std::endl;
+  out << " " << pretty_version_to_str(g_ceph_context) << std::endl;
   for (size_t i = skip; i < size; i++) {
     out << " " << (i-skip+1) << ": " << demangle(strings[i]) << std::endl;
   }
