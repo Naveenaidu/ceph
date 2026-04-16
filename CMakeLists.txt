@@ -161,6 +161,15 @@ endif()
 
 set(CEPH_MAN_DIR "share/man" CACHE STRING "Install location for man pages (relative to prefix).")
 
+set(CEPH_VENDOR_VERSION "" CACHE STRING
+  "Vendor-supplied version string written to <datadir>/ceph/vendor_version at install time.  \
+Leave empty (the default) to omit the file entirely.")
+if(CEPH_VENDOR_VERSION)
+  file(WRITE ${CMAKE_BINARY_DIR}/vendor_version "${CEPH_VENDOR_VERSION}\n")
+  install(FILES ${CMAKE_BINARY_DIR}/vendor_version
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/ceph)
+endif()
+
 option(ENABLE_SHARED "build shared libraries" ON)
 if(ENABLE_SHARED)
   set(CEPH_SHARED SHARED)

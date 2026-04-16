@@ -50,6 +50,9 @@ endif
 ifeq ($(SCCACHE), true)
 extraopts += -DWITH_SCCACHE=ON
 endif
+ifneq ($(CEPH_VENDOR_VERSION),)
+  extraopts += -DCEPH_VENDOR_VERSION=$(CEPH_VENDOR_VERSION)
+endif
 
 ifeq ($(DWZ), false)
 override_dh_dwz:
@@ -82,6 +85,10 @@ override_dh_auto_install:
 	install -D -m 440 sudoers.d/ceph-smartctl $(DESTDIR)/etc/sudoers.d/ceph-smartctl
 	install -D -m 755 src/tools/rbd_nbd/rbd-nbd_quiesce $(DESTDIR)/usr/libexec/rbd-nbd/rbd-nbd_quiesce
 
+	if [ -f $(CURDIR)/obj-$(DEB_HOST_GNU_TYPE)/vendor_version ]; then \
+		install -m 644 -D $(CURDIR)/obj-$(DEB_HOST_GNU_TYPE)/vendor_version \
+			$(DESTDIR)/usr/share/ceph/vendor_version; \
+	fi
 	install -m 644 -D monitoring/ceph-mixin/prometheus_alerts.yml $(DESTDIR)/etc/prometheus/ceph/ceph_default_alerts.yml
 	install -m 644 -D monitoring/ceph-mixin/dashboards_out/* ${DESTDIR}/etc/grafana/dashboards/ceph-dashboard
 

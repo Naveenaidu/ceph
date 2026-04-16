@@ -1477,6 +1477,7 @@ cmake .. \
     -DWITH_BABELTRACE:BOOL=OFF \
 %endif
     $CEPH_EXTRA_CMAKE_ARGS \
+%{?ceph_vendor_version: -DCEPH_VENDOR_VERSION="%{ceph_vendor_version}" \}
 %if 0%{with ocf}
     -DWITH_OCF:BOOL=ON \
 %endif
@@ -1829,6 +1830,7 @@ exit 0
 %{_mandir}/man8/rgw-gap-list.8*
 %{_mandir}/man8/rgw-restore-bucket-index.8*
 %dir %{_datadir}/ceph/
+%{?ceph_vendor_version:%{_datadir}/ceph/vendor_version}
 %{_datadir}/ceph/known_hosts_drop.ceph.com
 %{_datadir}/ceph/id_rsa_drop.ceph.com
 %{_datadir}/ceph/id_rsa_drop.ceph.com.pub

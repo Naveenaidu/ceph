@@ -6975,7 +6975,7 @@ options:
   type: str
   level: advanced
   desc: File where the vendor version information is fetched from
-  default: /usr/lib/ceph/ceph_vendor_version
+  default: @CEPH_INSTALL_FULL_DATADIR@/vendor_version
   services:
   - common
   flags:

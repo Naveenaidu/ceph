@@ -4,8 +4,9 @@ include(CheckCXXCompilerFlag)
 # for erasure and compressor plugins
 set(CEPH_INSTALL_PKGLIBDIR ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME})
 set(CEPH_INSTALL_FULL_PKGLIBDIR ${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME})
-# for mgr plugins
+# for mgr plugins and data files (e.g. vendor_version)
 set(CEPH_INSTALL_DATADIR ${CMAKE_INSTALL_FULL_DATADIR}/${PROJECT_NAME})
+set(CEPH_INSTALL_FULL_DATADIR ${CMAKE_INSTALL_FULL_DATADIR}/${PROJECT_NAME})
 # so libceph-common can be found
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 if(NOT CMAKE_INSTALL_RPATH)
