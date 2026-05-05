@@ -887,6 +887,18 @@ void ScrubMachine::push_span(const std::string& label)
   m_span_stack.push_back(std::move(span));
 }
 
+void ScrubMachine::push_span(const std::string& label, const jspan_context& parent_ctx)
+{
+  bool ctx_valid = parent_ctx.IsValid();
+  auto span = tracing::scrubber::tracer.add_span(label, parent_ctx);
+  bool span_recording = span && span->IsRecording();
+  dout(10) << "push_span(ctx): " << label
+	   << " parent_ctx_valid=" << ctx_valid
+	   << " stack_depth=" << m_span_stack.size()
+	   << " new_span_recording=" << span_recording << dendl;
+  m_span_stack.push_back(std::move(span));
+}
+
 void ScrubMachine::pop_span()
 {
   if (!m_span_stack.empty()) {
@@ -1150,6 +1162,11 @@ ReplicaActiveOp::ReplicaActiveOp(my_context ctx)
 {
   dout(10) << "-- state -->> ReplicaActive/ReplicaActiveOp" << dendl;
   DECLARE_LOCALS;  // 'scrbr' & 'pg_id' aliases
+  // Use the trace context propagated from the primary via MOSDRepScrub so that
+  // replica spans are linked under the same trace as the primary.
+  machine.push_span(
+      fmt::format("{}_replica_ReplicaActive/ReplicaActiveOp", pg_id.pgid),
+      machine.m_replica_parent_ctx);
   scrbr->on_replica_init();
 }
 
