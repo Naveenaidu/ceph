@@ -1109,7 +1109,8 @@ void ECBackend::objects_read_async(
     const list<pair<ec_align_t,
                     pair<bufferlist*, Context*>>> &to_read,
     Context *on_complete,
-    bool fast_read) {
+    bool fast_read,
+    OpRequestRef op) {
   map<hobject_t, std::list<ec_align_t>> reads;
 
   uint32_t flags = 0;
@@ -1217,6 +1218,7 @@ void ECBackend::objects_read_async(
     reads,
     fast_read,
     object_size,
+    op,
     make_gen_lambda_context<
       ECCommon::ec_extents_t&&, cb>(
       cb(this,
@@ -1281,16 +1283,18 @@ void ECBackend::objects_read_and_reconstruct(
   const map<hobject_t, std::list<ec_align_t>> &reads,
   bool fast_read,
   uint64_t object_size,
+  OpRequestRef op,
   GenContextURef<ECCommon::ec_extents_t&&> &&func) {
   return read_pipeline.objects_read_and_reconstruct(
-    reads, fast_read, object_size, std::move(func));
+    reads, fast_read, object_size, op, std::move(func));
 }
 
 void ECBackend::objects_read_and_reconstruct_for_rmw(
   map<hobject_t, read_request_t> &&to_read,
+  OpRequestRef op,
   GenContextURef<ECCommon::ec_extents_t&&> &&func) {
   return read_pipeline.objects_read_and_reconstruct_for_rmw(
-    std::move(to_read), std::move(func));
+    std::move(to_read), op, std::move(func));
 }
 
 void ECBackend::kick_reads() {

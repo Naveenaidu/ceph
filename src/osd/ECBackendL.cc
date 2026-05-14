@@ -833,7 +833,7 @@ bool ECBackendL::_handle_message(
     const MOSDECSubOpWriteReply *op = static_cast<const MOSDECSubOpWriteReply*>(
       _op->get_req());
     auto sub_span = tracing::osd::tracer.add_span("handle_sub_write_reply",
-    		  _op->pg_trace);
+    		  op->otel_trace);
     handle_sub_write_reply(op->op.from, op->op, sub_span);
     return true;
   }
@@ -956,7 +956,6 @@ void ECBackendL::handle_sub_write(
   if (msg) {
     msg->mark_event("sub_op_started");
   }
-  otel_trace->AddEvent("handle_sub_write");
 
   if (cct->_conf->bluestore_debug_inject_read_err &&
       ECInject::test_write_error3(op.soid)) {
@@ -1540,7 +1539,7 @@ void ECBackendL::submit_transaction(
   op->reqid = reqid;
   op->client_op = client_op;
   if (client_op) {
-    op->otel_trace = tracing::osd::tracer.add_span("submit_transaction",
+    op->otel_trace = tracing::osd::tracer.add_span("submit_transaction (legacy)",
     		   client_op->pg_trace);
   }
   op->plan = op->get_write_plan(
@@ -1586,7 +1585,8 @@ void ECBackendL::objects_read_async(
   const list<pair<ec_align_t,
                   pair<bufferlist*, Context*>>> &to_read,
   Context *on_complete,
-  bool fast_read)
+  bool fast_read,
+  OpRequestRef op)
 {
   map<hobject_t,std::list<ec_align_t>> reads;
 
@@ -1693,6 +1693,7 @@ void ECBackendL::objects_read_async(
   objects_read_and_reconstruct(
     reads,
     fast_read,
+    op,
     make_gen_lambda_context<
       ECCommonL::ec_extents_t &&, cb>(
 	cb(this,
@@ -1707,10 +1708,11 @@ void ECBackendL::objects_read_and_reconstruct(
     std::list<ec_align_t>
   > &reads,
   bool fast_read,
+  OpRequestRef op,
   GenContextURef<ECCommonL::ec_extents_t &&> &&func)
 {
   return read_pipeline.objects_read_and_reconstruct(
-    reads, fast_read, std::move(func));
+    reads, fast_read, op, std::move(func));
 }
 
 void ECBackendL::kick_reads() {
