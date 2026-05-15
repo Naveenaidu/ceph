@@ -512,7 +512,7 @@ class PgScrubber : public ScrubPgIF,
   void queue_for_scrub_resched(Scrub::scrub_prio_t prio) final;
 
   void get_replicas_maps(bool replica_can_preempt,
-       const jspan_context& parent_ctx) final;
+       const otel_span_context_t& parent_ctx) final;
 
   void on_digest_updates() final;
 
@@ -959,7 +959,7 @@ class PgScrubber : public ScrubPgIF,
 			  hobject_t end,
 			  bool deep,
 			  bool allow_preemption,
-			  const jspan_context& parent_ctx);
+			  const otel_span_context_t& parent_ctx);
 
 
   Scrub::MapsCollectionStatus m_maps_status;

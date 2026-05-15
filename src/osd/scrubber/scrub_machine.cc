@@ -620,7 +620,7 @@ sc::result WaitLastUpdate::react(const InternalAllUpdates&)
 
   auto& span = context<ScrubMachine>().current_span();
   bool span_valid = span && span->IsRecording();
-  auto ctx = span ? span->GetContext() : jspan_context{false, false};
+  auto ctx = span ? span->GetContext() : otel_span_context_t{false, false};
   dout(10) << "WaitLastUpdate::react: propagating trace to replicas"
 	   << " current_span_recording=" << span_valid
 	   << " ctx_valid=" << ctx.IsValid()
@@ -845,7 +845,7 @@ sc::result WaitDigestUpdate::react(const ScrubFinished&)
   return transit<PrimaryIdle>();
 }
 
-ScrubMachine::ScrubMachine(PG* pg, ScrubMachineListener* pg_scrub, jspan_ptr root_span)
+ScrubMachine::ScrubMachine(PG* pg, ScrubMachineListener* pg_scrub, otel_span_ref root_span)
     : m_pg_id{pg->pg_id}
     , m_scrbr{pg_scrub}
 {
@@ -864,16 +864,16 @@ ScrubMachine::ScrubMachine(PG* pg, ScrubMachineListener* pg_scrub, jspan_ptr roo
 
 ScrubMachine::~ScrubMachine() = default;
 
-static const jspan_ptr empty_jspan_ptr;
+static const otel_span_ref empty_otel_span_ref;
 
-const jspan_ptr& ScrubMachine::current_span() const
+const otel_span_ref& ScrubMachine::current_span() const
 {
-  return m_span_stack.empty() ? empty_jspan_ptr : m_span_stack.back();
+  return m_span_stack.empty() ? empty_otel_span_ref : m_span_stack.back();
 }
 
 void ScrubMachine::push_span(const std::string& label)
 {
-  jspan_ptr span;
+  otel_span_ref span;
   if (!m_span_stack.empty()) {
     auto& parent = m_span_stack.back();
     span = tracing::scrubber::tracer.add_span(label, parent);
@@ -887,7 +887,7 @@ void ScrubMachine::push_span(const std::string& label)
   m_span_stack.push_back(std::move(span));
 }
 
-void ScrubMachine::push_span(const std::string& label, const jspan_context& parent_ctx)
+void ScrubMachine::push_span(const std::string& label, const otel_span_context_t& parent_ctx)
 {
   bool ctx_valid = parent_ctx.IsValid();
   auto span = tracing::scrubber::tracer.add_span(label, parent_ctx);

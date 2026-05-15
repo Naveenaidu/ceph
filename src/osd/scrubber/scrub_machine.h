@@ -294,7 +294,7 @@ class ScrubMachine : public ScrubFsmIf, public sc::state_machine<ScrubMachine, N
  public:
   friend class PgScrubber;
 
-  explicit ScrubMachine(PG* pg, ScrubMachineListener* pg_scrub, jspan_ptr root_span);
+  explicit ScrubMachine(PG* pg, ScrubMachineListener* pg_scrub, otel_span_ref root_span);
   virtual ~ScrubMachine();
 
   spg_t m_pg_id;
@@ -302,25 +302,25 @@ class ScrubMachine : public ScrubFsmIf, public sc::state_machine<ScrubMachine, N
 
   /// span stack for tracing - mirrors the state machine nesting.
   /// Each state constructor pushes a span, each destructor pops it.
-  std::vector<jspan_ptr> m_span_stack;
+  std::vector<otel_span_ref> m_span_stack;
 
   /// saved context from the root span created in PgScrubber ctor.
   /// The root span itself ends promptly (so it gets exported), but its
   /// context stays valid and serves as the parent when the stack is empty.
-  jspan_context m_root_ctx{false, false};
+  otel_span_context_t m_root_ctx{false, false};
 
   /// trace context received from primary via MOSDRepScrub
-  jspan_context m_replica_parent_ctx{false, false};
+  otel_span_context_t m_replica_parent_ctx{false, false};
 
-  /// return the current (topmost) span, or an empty jspan_ptr if the stack is empty
-  const jspan_ptr& current_span() const;
+  /// return the current (topmost) span, or an empty otel_span_ref if the stack is empty
+  const otel_span_ref& current_span() const;
 
   /// push a new span as a child of the current top-of-stack span,
   /// or as a child of the root context if the stack is empty.
   void push_span(const std::string& label);
 
   /// push a new span parented to a specific trace context (for replica spans)
-  void push_span(const std::string& label, const jspan_context& parent_ctx);
+  void push_span(const std::string& label, const otel_span_context_t& parent_ctx);
 
   /// pop and end the topmost span
   void pop_span();
@@ -348,7 +348,7 @@ class ScrubMachine : public ScrubFsmIf, public sc::state_machine<ScrubMachine, N
     sc::state_machine<ScrubMachine, NotActive>::process_event(evt);
   }
 
-  void set_replica_parent_ctx(const jspan_context& ctx) {
+  void set_replica_parent_ctx(const otel_span_context_t& ctx) {
     m_replica_parent_ctx = ctx;
   }
 

@@ -164,7 +164,7 @@ struct ScrubMachineListener {
    * Ask all replicas for their scrub maps for the current chunk.
    */
   virtual void get_replicas_maps(bool replica_can_preempt,
-         const jspan_context& parent_ctx) = 0;
+         const otel_span_context_t& parent_ctx) = 0;
 
   virtual void on_digest_updates() = 0;
 

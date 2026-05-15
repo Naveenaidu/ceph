@@ -1175,7 +1175,7 @@ eversion_t PgScrubber::search_log_for_updates() const
 }
 
 void PgScrubber::get_replicas_maps(bool replica_can_preempt,
-           const jspan_context& parent_ctx)
+           const otel_span_context_t& parent_ctx)
 {
   dout(10) << __func__ << " started in epoch/interval: " << m_epoch_start << "/"
 	   << m_interval_start << " pg same_interval_since: "
@@ -1249,7 +1249,7 @@ void PgScrubber::_request_scrub_map(pg_shard_t replica,
 				    hobject_t end,
 				    bool deep,
 				    bool allow_preemption,
-            const jspan_context& parent_ctx)
+            const otel_span_context_t& parent_ctx)
 {
   ceph_assert(replica != m_pg_whoami);
   dout(10) << __func__ << " scrubmap from osd." << replica
