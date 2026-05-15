@@ -38,6 +38,7 @@
 #include "common/TracepointProvider.h"
 #include "common/ceph_argparse.h"
 #include "common/numa.h"
+#include "common/tracer.h"
 
 #include "global/global_init.h"
 #include "global/signal_handler.h"
@@ -138,6 +139,10 @@ int main(int argc, const char **argv)
     args, CEPH_ENTITY_TYPE_OSD,
     CODE_ENVIRONMENT_DAEMON, 0);
   ceph_heap_profiler_init();
+
+  // Set root service name for hierarchical tracer naming
+  // This must be done early, before any tracer initialization
+  tracing::Tracer::set_root_service_name("ceph-osd");
 
   Preforker forker;
 

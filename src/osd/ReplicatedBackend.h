@@ -151,9 +151,10 @@ public:
     const hobject_t &hoid,
     uint64_t object_size,
     const std::list<std::pair<ec_align_t,
-	       std::pair<ceph::buffer::list*, Context*> > > &to_read,
+        std::pair<ceph::buffer::list*, Context*> > > &to_read,
                Context *on_complete,
-               bool fast_read = false) override;
+               bool fast_read = false,
+               OpRequestRef op = OpRequestRef()) override;
   bool get_ec_supports_crc_encode_decode() const override;
   ECUtil::stripe_info_t ec_get_sinfo() const override;
   bool ec_can_decode(const shard_id_set &available_shards) const override;
