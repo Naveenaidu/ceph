@@ -208,3 +208,221 @@ AvlAllocator is currently the production default. It keeps two intrusive AVL tre
 
 HybridAllocator exists because even AVL trees can use too much RAM on very fragmented, large devices. It puts a cap (bluestore_hybrid_alloc_mem_cap) on tree entries and
 overflows the rest to a bitmap, trading allocation quality for bounded memory.
+
+---
+
+## Who selects the allocator?
+
+It is a **user-configurable option** — specifically the `bluestore_allocator` config key. You set it in `ceph.conf` or via `ceph config set`:
+
+```ini
+[osd]
+bluestore_allocator = avl
+```
+
+The default (as of this codebase) is `hybrid`. BlueStore reads it at OSD startup in `BlueStore::_create_alloc()` (`BlueStore.cc:7464`) and passes the string straight to `Allocator::create()`. The allocator type is **fixed for the lifetime of that OSD** — changing it requires a restart and a full device re-init (the free space structure is rebuilt from the RocksDB freelist on startup, so the on-disk format is allocator-agnostic).
+
+---
+
+## Which allocator for which use case?
+
+| Allocator | When to use |
+|---|---|
+| `hybrid` **(default)** | General purpose. Keeps the best free extents in an AVL tree and spills the rest to a bitmap once RAM exceeds `bluestore_hybrid_alloc_mem_cap` (default 64 MB). Good balance across HDD and SSD. |
+| `avl` | If your OSD has plenty of RAM and you want the best allocation quality (least fragmentation). Memory grows with extent count — on a heavily fragmented multi-TB device this can run into hundreds of MB. |
+| `btree` / `hybrid_btree2` | Experimental successors to `avl`/`hybrid`. `hybrid_btree2` adds a `bluestore_btree2_alloc_weight_factor` that biases allocation toward large contiguous extents — useful when you want to aggressively avoid fragmentation on write-heavy workloads. |
+| `bitmap` | Predictable, fixed memory (1 bit per block). Useful when RAM is severely constrained and you don't care about fragmentation quality. Memory scales with **device size**, not free extent count. |
+| `stupid` | **Testing only** — the config description says so explicitly. Simple bucket list, poor behavior under real workloads. |
+
+---
+
+## The second dimension: `bluestore_allocator_lookup_policy`
+
+There is a second config — `bluestore_allocator_lookup_policy` — that controls *where* the allocator starts its search for a free extent within the chosen allocator:
+
+- `hdd_optimized` — searches from where the last allocation landed, promoting sequential writes. Good for HDDs and QLC SSDs.
+- `ssd_optimized` — always searches from the start of the device, spreading writes across the device to aid SSD firmware wear-leveling / housekeeping.
+- `auto` *(default)* — BlueStore detects whether the device is rotational and picks the right policy automatically.
+
+This is independent of the allocator type — you can combine any allocator with either lookup policy.
+
+## Does the allocator manage both HDD and SSD?
+
+No. A single allocator instance manages **one block device**. It doesn't straddle two devices.
+
+BlueStore can be configured with **multiple devices** — a fast device (NVMe SSD) for RocksDB metadata and WAL, and a slow device (HDD) for bulk object data. In that case it creates separate allocator instances, one per device. BlueFS (the internal filesystem BlueStore uses for RocksDB) manages the fast device separately with its own allocation logic.
+
+The allocator can sit on top of any block device — HDD, SSD, or NVMe. A typical all-flash cluster would have:
+- An NVMe SSD as the main data device
+- The `avl` or `hybrid` allocator managing its free extents
+- `bluestore_allocator_lookup_policy = auto` detecting it is non-rotational and picking `ssd_optimized`
+
+## How the HybridAllocator works
+
+### The core problem it solves
+
+**AvlAllocator** is great at finding large, contiguous free extents — but its memory usage grows with the number of free extent entries, not device size. On a heavily fragmented multi-TB device, the AVL tree can hold millions of tiny extents and consume hundreds of MB of RAM.
+
+**BitmapAllocator** uses fixed memory (1 bit per block), but is poor at finding the best free extent quickly — it just scans bits.
+
+HybridAllocator takes the best of both: use the AVL/Btree tree for as long as RAM allows, then spill overflow into the bitmap.
+
+---
+
+### Architecture
+
+```
+HybridAllocatorBase<AvlAllocator>    (= "hybrid")
+HybridAllocatorBase<Btree2Allocator> (= "hybrid_btree2")
+
+┌─────────────────────────────────────────────────────┐
+│                 HybridAllocator                     │
+│                                                     │
+│  ┌─────────────────────────┐                        │
+│  │   Primary Allocator     │  ← AVL or Btree2       │
+│  │   (tree, in RAM)        │                        │
+│  │                         │  max_mem = 64 MB cap   │
+│  │  offset-tree + size-tree│                        │
+│  │  (best-fit, fast)       │                        │
+│  └──────────┬──────────────┘                        │
+│             │ overflow via _spillover_range()        │
+│             ▼                                        │
+│  ┌─────────────────────────┐                        │
+│  │   BitmapAllocator       │  ← created lazily      │
+│  │   (fallback, in RAM)    │                        │
+│  │                         │  1 bit per block        │
+│  │  fixed memory, lower    │  fixed memory cost     │
+│  │  allocation quality     │                        │
+│  └─────────────────────────┘                        │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+### What "spillover" means
+
+The primary AVL/Btree tracks how many entries it holds. When that count exceeds the `max_mem` threshold (default 64 MB worth of entries), it calls `_spillover_range()` on the excess entries — the smallest, least-useful extents get evicted from the tree and handed to the bitmap.
+
+```
+Device free space (conceptual):
+
+Offset:  0    1G    2G    3G    4G    5G    6G    7G    8G
+         |    |     |     |     |     |     |     |     |
+         [free][used][  free  ][u][free][used][       free       ]
+
+Primary tree holds (large/important extents):
+  → (2G, 1G)       ← 1 GB extent
+  → (4G, 512M)     ← 512 MB extent
+  → (6G, 2G)       ← 2 GB extent
+
+Bitmap holds (small/spilled extents):
+  → bit 0 = 1      ← tiny 4K fragment at offset 0
+  → bit N = 1      ← another tiny fragment
+  → ...
+```
+
+The tree keeps the large extents because those are the ones that matter for allocation quality. Tiny fragments that can't satisfy most requests anyway get demoted to the cheaper bitmap.
+
+---
+
+### Allocation flow
+
+```
+allocate(want) called
+        │
+        ▼
+  want < lowest_size_in_tree?
+        │
+   YES  │  NO
+        │  └──► try Primary tree first
+        │              │
+        │         found enough?──YES──► done ✓
+        │              │NO
+        │              └──► try Bitmap for remainder
+        │                         │
+        │                    found?──YES──► done ✓
+        │                         │NO
+        │                         └──► return -ENOSPC
+        │
+        └──► try Bitmap first  ← avoids splitting a large tree extent
+                   │             for a tiny request
+              found enough?──YES──► done ✓
+                   │NO
+                   └──► try Primary tree for remainder
+```
+
+The key decision at `HybridAllocator_impl.h:42`:
+```cpp
+bool primary_first = !(bmap_alloc &&
+                       bmap_alloc->get_free() &&
+                       want < T::_lowest_size_available());
+```
+If the request is smaller than the smallest extent in the tree, try the bitmap first — no point fragmenting a 1 GB tree extent to satisfy a 4 KB write.
+
+---
+
+### Release and merge-back flow
+
+When an extent is freed, HybridAllocator tries to absorb adjacent bitmap entries back into the tree (`HybridAllocator.h:101`):
+
+```cpp
+void _add_to_tree(uint64_t start, uint64_t size) override {
+  if (bmap_alloc) {
+    uint64_t head = bmap_alloc->claim_free_to_left(start);
+    uint64_t tail = bmap_alloc->claim_free_to_right(start + size);
+    start -= head;
+    size  += head + tail;
+  }
+  PrimaryAllocator::_add_to_tree(start, size);
+}
+```
+
+Example:
+```
+Before release of extent at offset 500M, length 100M:
+
+  Bitmap: [free: 480M~20M]        [free: 600M~50M]
+  Tree:   (nothing at this region — it was spilled)
+
+After release:
+  claim_free_to_left(500M)  → absorbs 480M~20M from bitmap
+  claim_free_to_right(600M) → absorbs 600M~50M from bitmap
+  merged extent: (480M, 170M) → promoted into primary tree
+
+  Tree: (480M, 170M)  ← one large merged extent, now searchable
+```
+
+Freed space naturally coalesces back into the tree, preventing the bitmap from accumulating large free regions that the tree would be better at serving.
+
+---
+
+### The Btree2 variant adds a lockless cache
+
+`hybrid_btree2` adds an `OpportunisticExtentCache` (`AllocatorBase.h:179`) — 16 buckets of 16 slots each, covering extent sizes 4K, 8K, 12K ... 64K. Recently freed small extents are stashed here without taking the main allocator lock, and allocation checks this cache first.
+
+```
+allocate(want=4K)
+    │
+    ▼
+check OpportunisticExtentCache[bucket for 4K]
+    │
+  hit?──YES──► return cached offset (no lock needed!) ✓
+    │NO
+    └──► fall through to normal AVL/Bitmap path (takes lock)
+```
+
+This matters for write-heavy small-IO workloads where the same 4K–64K extents are constantly allocated and freed — cache hits avoid lock contention entirely.
+
+---
+
+### Why Hybrid beats the alternatives
+
+| Scenario | Pure AVL | Pure Bitmap | Hybrid |
+|---|---|---|---|
+| Fresh device, low fragmentation | Good | OK | Good (tree handles it all) |
+| Heavy fragmentation, millions of tiny extents | RAM blows up | Fixed RAM, slow allocation | Tree keeps large extents, bitmap absorbs tiny ones |
+| Tiny IO (4K writes), high concurrency | Lock contention on tree | Lock contention on bitmap | Cache hits bypass lock entirely (btree2 variant) |
+| Multi-TB device, low RAM OSD | Unusable | Fixed cost, works | Bounded by `max_mem`, degrades gracefully |
+| Request smaller than smallest tree extent | Splits a large extent (wasteful) | Scans bits | Tries bitmap first, preserves large extents |
+
+The core insight: **not all free extents are equal**. Large extents are precious — they satisfy any allocation and should live in the fast tree. Tiny fragments are mostly noise — they belong in the cheap bitmap. Hybrid sorts them accordingly.
