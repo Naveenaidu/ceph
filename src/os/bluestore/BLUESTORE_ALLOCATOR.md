@@ -179,3 +179,32 @@ The delay is intentional: a **deferred write** from transaction N might be writi
 |---|---|---|---|
 | `Allocator` (AvlAllocator etc.) | RAM | Yes (from FreelistManager) | Fast in-memory free space lookup for the write path |
 | `BitmapFreelistManager` | RocksDB | No (source of truth) | Persistent free space bitmap, updated atomically with metadata |
+
+
+---
+Why there are multiple allocator implementations
+
+Each allocator makes different tradeoffs between speed, memory use, and allocation quality (how fragmented the resulting free space becomes):
+
+┌─────────────────┬─────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────────┐
+│    Allocator    │           Data structure            │                                 Key tradeoff                                  │
+├─────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+│ StupidAllocator │ Simple bucket list                  │ Fast, low memory, poor fragmentation handling — legacy/fallback               │
+├─────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+│ BitmapAllocator │ Bit array                           │ O(1) ops, but memory scales with device size (1 bit per block)                │
+├─────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+│ AvlAllocator    │ Two AVL trees (by offset + by size) │ Good allocation quality, memory scales with free extent count not device size │
+├─────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+│ BtreeAllocator  │ B-tree variant                      │ Similar to AVL, different balancing/cache behavior                            │
+├─────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+│ Btree2Allocator │ Newer B-tree variant                │ Experimental successor to BtreeAllocator                                      │
+├─────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+│ HybridAllocator │ AVL/Btree + Bitmap fallback         │ Caps memory: keeps hot extents in tree, spills rest to bitmap                 │
+└─────────────────┴─────────────────────────────────────┴───────────────────────────────────────────────────────────────────────────────┘
+
+AvlAllocator is currently the production default. It keeps two intrusive AVL trees (you can see offset_hook and size_hook in AvlAllocator.h:32-44): one sorted by offset
+(for fast range lookups) and one sorted by size (to quickly find a best-fit free extent). Memory cost is proportional to the number of free extents, not total device size
+— important for multi-TB drives.
+
+HybridAllocator exists because even AVL trees can use too much RAM on very fragmented, large devices. It puts a cap (bluestore_hybrid_alloc_mem_cap) on tree entries and
+overflows the rest to a bitmap, trading allocation quality for bounded memory.
