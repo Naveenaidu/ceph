@@ -11,6 +11,7 @@ import errno
 import hashlib
 import json
 import rbd
+import re
 import requests
 import uuid
 import time
@@ -56,6 +57,29 @@ LICENSE = 'sharing-1-0'
 LICENSE_NAME = 'Community Data License Agreement - Sharing - Version 1.0'
 LICENSE_URL = 'https://cdla.io/sharing-1-0/'
 NO_SALT_CNT = 0
+
+# Labels of labeled perf counters may hold user-chosen names (file systems,
+# subvolume paths, pools, RBD images, RGW users, buckets and topics, mirror
+# peers and directories, ...). Every label value is anonymized before it is
+# reported, unless its key is listed here *and* the value matches the key's
+# pattern. Matching on the value as well keeps a name from being reported in
+# the clear when a future counter reuses one of these generic key names.
+PERF_LABELS_NOT_ANONYMIZED: Dict[str, 're.Pattern[str]'] = {
+    'level': re.compile(r'(shallow|deep)'),
+    'pooltype': re.compile(r'(replicated|ec)'),
+    'rank': re.compile(r'\d+'),
+    'id': re.compile(r'\d+'),
+    'shard_id': re.compile(r'\d+'),
+    'source_fscid': re.compile(r'\d+'),
+}
+
+# Labels whose value is an entity name ("<type>.<id>"); only the id part is
+# anonymized, the same way daemon names are.
+PERF_LABELS_ENTITY_NAME = {'client'}
+
+# Prefixes of labeled perf counter collections whose name carries a
+# user-chosen name after the prefix, e.g. "mds_client_metrics-<fs_name>".
+PERF_COLLECTION_PREFIXES_WITH_NAME = ('mds_client_metrics-',)
 
 # Latest revision of the telemetry report.  Bump this each time we make
 # *any* change.
@@ -504,27 +528,55 @@ class Module(MgrModule):
             'active_changed': sorted(list(active)),
         }
 
+    def _salted_hash(self, value: str) -> str:
+        global NO_SALT_CNT
+        salt = self.salt
+        # avoid asserting that salt exists
+        if not salt:
+            # do not set self.salt to a temp value
+            salt = f"no_salt_found_{NO_SALT_CNT}"
+            NO_SALT_CNT += 1
+            self.log.debug(f"No salt found, created a temp one: {salt}")
+        m = hashlib.sha1()
+        m.update(salt.encode('utf-8'))
+        m.update(value.encode('utf-8'))
+        m.update(salt.encode('utf-8'))
+        return m.hexdigest()
+
     def anonymize_entity_name(self, entity_name:str) -> str:
         if '.' not in entity_name:
             self.log.debug(f"Cannot split entity name ({entity_name}), no '.' is found")
             return entity_name
 
         (etype, eid) = entity_name.split('.', 1)
-        m = hashlib.sha1()
-        salt = ''
-        if self.salt is not None:
-            salt = self.salt
-        # avoid asserting that salt exists
-        if not self.salt:
-            # do not set self.salt to a temp value
-            salt = f"no_salt_found_{NO_SALT_CNT}"
-            NO_SALT_CNT += 1
-            self.log.debug(f"No salt found, created a temp one: {salt}")
-        m.update(salt.encode('utf-8'))
-        m.update(eid.encode('utf-8'))
-        m.update(salt.encode('utf-8'))
+        return etype + '.' + self._salted_hash(eid)
 
-        return  etype + '.' + m.hexdigest()
+    def anonymize_perf_labels(self, labels: Dict[str, str]) -> Dict[str, str]:
+        """
+        Return a copy of a labeled perf counter's labels that is safe to
+        report: see PERF_LABELS_NOT_ANONYMIZED.
+        """
+        result = {}
+        for key, value in labels.items():
+            value = str(value)
+            pattern = PERF_LABELS_NOT_ANONYMIZED.get(key)
+            if value == '' or (pattern is not None and pattern.fullmatch(value)):
+                result[key] = value
+            elif key in PERF_LABELS_ENTITY_NAME and '.' in value:
+                result[key] = self.anonymize_entity_name(value)
+            else:
+                result[key] = self._salted_hash(value)
+        return result
+
+    def anonymize_perf_collection(self, collection: str) -> str:
+        """
+        Anonymize the user-chosen name embedded in some labeled perf counter
+        collection names: see PERF_COLLECTION_PREFIXES_WITH_NAME.
+        """
+        for prefix in PERF_COLLECTION_PREFIXES_WITH_NAME:
+            if collection.startswith(prefix) and len(collection) > len(prefix):
+                return prefix + self._salted_hash(collection[len(prefix):])
+        return collection
 
     def get_heap_stats(self) -> Dict[str, dict]:
         result: Dict[str, dict] = defaultdict(_defaultdict_defaultdict_int)
@@ -813,12 +865,8 @@ class Module(MgrModule):
 
             # entity_name might have more than one '.', beware
             (etype, eid) = c.get('entity_name', '').split('.', 1)
-            m = hashlib.sha1()
             assert self.salt
-            m.update(self.salt.encode('utf-8'))
-            m.update(eid.encode('utf-8'))
-            m.update(self.salt.encode('utf-8'))
-            c['entity_name'] = etype + '.' + m.hexdigest()
+            c['entity_name'] = etype + '.' + self._salted_hash(eid)
 
             # redact final line of python tracebacks, as the exception
             # payload may contain identifying information
@@ -896,11 +944,15 @@ class Module(MgrModule):
                     self.log.debug("Instance of an empty key: {}{}".format(daemon, collection))
                     continue
 
+                # labeled perf counters may carry user-chosen names, both in
+                # some collection names and in their labels
+                collection = self.anonymize_perf_collection(collection)
                 result[daemon][collection] = []
 
                 for sub_collection in sub_collection_list:
                     sub_collection_result: Dict[str, dict] = defaultdict(_defaultdict_dict)
-                    sub_collection_result['labels'] = sub_collection['labels']
+                    sub_collection_result['labels'] = \
+                        self.anonymize_perf_labels(sub_collection['labels'])
                     for sub_collection_counter_name, sub_collection_counter_info in sub_collection['counters'].items():
                         if mode == 'separated':
                             # Add value to result

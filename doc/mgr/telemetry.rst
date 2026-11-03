@@ -55,6 +55,11 @@ has no effect.)
     - troubleshoot issues with latency, throttling, memory management, etc.
     - monitor cluster performance by daemon
 
+  Daemon names (except OSD IDs) are anonymized. Labels of labeled performance
+  counters (for example file system, subvolume, pool, RBD image, RGW user,
+  bucket and topic names) are anonymized as well, except for a few labels
+  that hold only numeric IDs or fixed values (such as the scrub level).
+
 The reported data does *not* contain any sensitive data. This means that the
 reported data does not include pool names, object names, object contents,
 hostnames, or device serial numbers.
