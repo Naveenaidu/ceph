@@ -25,6 +25,13 @@ using label_pair = std::pair<std::string_view, std::string_view>;
 ///         {"key1", "val1"}, {"key2", "val2"}
 ///       });
 /// \endcode
+///
+/// Note: perf counters created with key_create() are reported by the
+/// telemetry perf channel. The counter name (the first argument) is reported
+/// as is; label values are anonymized unless the label is listed in
+/// PERF_LABELS_NOT_ANONYMIZED in src/pybind/mgr/telemetry/module.py.
+/// Never build user-chosen names (pools, file systems, images, buckets, ...)
+/// into the counter name: pass them as labels instead.
 template <std::size_t Count>
 std::string key_create(std::string_view counter_name,
                        label_pair (&&labels)[Count]);
