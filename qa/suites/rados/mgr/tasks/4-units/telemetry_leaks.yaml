@@ -1,0 +1,30 @@
+# Check that the telemetry report does not contain the user-chosen names
+# (file systems, subvolumes, RGW users and buckets) that labeled perf counters
+# carry. The rbd-mirror counters are checked in
+# rbd/mirror/workloads/rbd-mirror-telemetry-leaks-workunit.yaml.
+overrides:
+  install:
+    extra_system_packages:
+      deb:
+        - s3cmd
+      rpm:
+        - s3cmd
+  ceph:
+    conf:
+      client:
+        # without these, rgw does not create the per-user and per-bucket
+        # labeled perf counters
+        rgw user counters cache: true
+        rgw bucket counters cache: true
+    log-ignorelist:
+      # the test creates a second file system
+      - \(FS_DEGRADED\)
+      - \(MDS_ALL_DOWN\)
+      - \(MDS_UP_LESS_THAN_MAX\)
+      - \(MDS_INSUFFICIENT_STANDBY\)
+tasks:
+  - rgw: [client.0]
+  - workunit:
+      clients:
+        client.0:
+          - mgr/test_telemetry_leaks.sh

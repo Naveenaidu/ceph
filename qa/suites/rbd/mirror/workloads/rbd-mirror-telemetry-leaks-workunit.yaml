@@ -1,0 +1,12 @@
+meta:
+- desc: check that telemetry does not report the pool, namespace and image names in rbd-mirror's perf counter labels
+tasks:
+- workunit:
+    clients:
+      cluster1.client.mirror: [rbd/rbd_mirror_telemetry_leaks.sh]
+    env:
+      # override workunit setting of CEPH_ARGS='--cluster'
+      CEPH_ARGS: ''
+      RBD_MIRROR_INSTANCES: '1'
+      RBD_MIRROR_USE_EXISTING_CLUSTER: '1'
+      RBD_MIRROR_MODE: 'snapshot'
